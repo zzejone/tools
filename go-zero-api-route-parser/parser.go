@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/zeromicro/go-zero/tools/goctl/api/parser"
+	"github.com/zeromicro/go-zero/tools/goctl/api/spec"
 )
 
 // Parser API 解析器
@@ -34,17 +35,19 @@ func (p *Parser) ParseFiles(filePaths ...string) (ParseResult, error) {
 // ParseFile 使用 goctl 官方 spec 包解析单个 API 文件
 //
 // 注意：spec 包不会自动合并 @server 的 prefix，需要手动拼接。
-func (p *Parser) ParseFile(filePath string) ([]RouteInfo, error) {
-	apiSpec, err := parser.Parse(filePath)
+func (p *Parser) ParseFile(filePath string) (fileInfo FileInfo, err error) {
+	var apiSpec *spec.ApiSpec
+	apiSpec, err = parser.Parse(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("解析失败: %w", err)
+		return
 	}
 
-	var routes []RouteInfo
+	var serviceInfo ServiceInfo
+	serviceInfo.Name = apiSpec.Service.Name
+	serviceInfo.Groups = []GroupInfo{}
 
 	for _, group := range apiSpec.Service.Groups {
-		serviceName := apiSpec.Service.Name
-
+		var routes []RouteInfo
 		for _, route := range group.Routes {
 			// 手动拼接 @server prefix
 			originalPath := route.Path
@@ -59,12 +62,10 @@ func (p *Parser) ParseFile(filePath string) ([]RouteInfo, error) {
 			}
 
 			routeInfo := RouteInfo{
-				Method:      strings.ToUpper(route.Method),
-				Path:        convertDynamicPath(originalPath),
-				Handler:     route.Handler,
-				Group:       group.Annotation.Properties["group"],
-				ServiceName: serviceName,
-				Doc:         doc,
+				Method:  strings.ToUpper(route.Method),
+				Path:    convertDynamicPath(originalPath),
+				Handler: route.Handler,
+				Doc:     doc,
 			}
 
 			if p.KeepOriginalPath {
@@ -73,9 +74,21 @@ func (p *Parser) ParseFile(filePath string) ([]RouteInfo, error) {
 
 			routes = append(routes, routeInfo)
 		}
+
+		var _group GroupInfo
+		_group.Name = group.Annotation.Properties["group"]
+		_group.Annotation = group.Annotation.Properties
+		_group.Routes = routes
+
+		serviceInfo.Groups = append(serviceInfo.Groups, _group)
 	}
 
-	return routes, nil
+	fileInfo.Title = apiSpec.Info.Title
+	fileInfo.Desc = apiSpec.Info.Desc
+	fileInfo.Version = apiSpec.Info.Version
+	fileInfo.Service = serviceInfo
+
+	return fileInfo, nil
 }
 
 // convertDynamicPath 将 :param 形式的动态路径转换为通配符形式

@@ -6,10 +6,27 @@ type RouteInfo struct {
 	Path         string `json:"path"`
 	OriginalPath string `json:"originalPath"`
 	Handler      string `json:"handler"`
-	Group        string `json:"group"`
-	ServiceName  string `json:"serviceName"`
 	Doc          string `json:"doc"`
 }
 
 // ParseResult key 是文件名，value 是路由列表
-type ParseResult map[string][]RouteInfo
+type ParseResult map[string]FileInfo
+
+type ServiceInfo struct {
+	Name   string      `json:"name"`
+	Groups []GroupInfo `json:"groups"`
+}
+
+type GroupInfo struct {
+	Name       string            `json:"name"`
+	Annotation map[string]string `json:"annotation"`
+	Routes     []RouteInfo       `json:"routes"`
+}
+
+type FileInfo struct {
+	Title   string `json:"title"`
+	Desc    string `json:"desc"`
+	Version string `json:"version"`
+
+	Service ServiceInfo `json:"service"`
+}
